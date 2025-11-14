@@ -245,23 +245,6 @@ def get_llama_activations_bau(model, prompt, device):
 
     return hidden_states, head_wise_hidden_states, mlp_wise_hidden_states
 
-
-def get_llama_activations_bau_new_model(model, prompt, device):
-    HEADS = [f"model.layers.{i}.self_attn.o_proj" for i in range(model.config.num_hidden_layers)]
-    mlp_wise_hidden_states = []
-    with torch.no_grad():
-        prompt = prompt.to(device)
-        with TraceDict(model, HEADS, retain_input=True) as ret:
-            output = model(prompt, output_hidden_states=True)
-        hidden_states = output.hidden_states
-        hidden_states = torch.stack(hidden_states, dim=0).squeeze()
-        hidden_states = hidden_states.detach().cpu().numpy()
-        head_wise_hidden_states = [ret[head].input.squeeze().detach().cpu() for head in HEADS]
-        head_wise_hidden_states = torch.stack(head_wise_hidden_states, dim=0).squeeze().numpy()
-
-    return hidden_states, head_wise_hidden_states, mlp_wise_hidden_states
-
-
 def get_llama_logits(model, prompt, device):
     model.eval()
     with torch.no_grad():
@@ -345,7 +328,7 @@ def tqa_run_answers(ratio, alpha, num_back, threshold, top_heads, top_heads_id, 
             for pos in range(max_new_token):
                 with TraceDict(model, HEADS) as ret:
                     outputs = model(input_ids)
-                next_token_logits = outputs.logits[:, -1, :]  # 获取最后一个 token 的 logits
+                next_token_logits = outputs.logits[:, -1, :]
                 next_token = torch.topk(next_token_logits, k=1, dim=-1)[1]
                 input_ids = torch.cat([input_ids, next_token], dim=-1)
                 generated_tokens.append(next_token)
